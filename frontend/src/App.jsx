@@ -1,86 +1,203 @@
 import { useState } from 'react'
 import './App.css'
 
+// ── Platform & Tone Config ────────────────────────────────────────────────────
+const PLATFORMS = [
+  { value: 'Facebook',  label: 'Facebook',  icon: '📘' },
+  { value: 'Twitter',   label: 'Twitter/X', icon: '🐦' },
+  { value: 'Instagram', label: 'Instagram', icon: '📸' },
+]
+
+const TONES = [
+  { value: 'professional', label: 'Professional', icon: '💼' },
+  { value: 'funny',        label: 'Funny & Casual', icon: '😂' },
+]
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function parseResult(raw) {
+  // Split the backend text into structured sections
+  const captionMatch  = raw.match(/📝 Caption:\s*([\s\S]*?)(?=#️⃣|🎨|$)/);
+  const hashtagsMatch = raw.match(/#️⃣ Hashtags:\s*([\s\S]*?)(?=🎨|$)/);
+  const visualMatch   = raw.match(/🎨 Visual Concept:\s*([\s\S]*)/);
+
+  return {
+    caption:  captionMatch  ? captionMatch[1].trim()  : raw.trim(),
+    hashtags: hashtagsMatch ? hashtagsMatch[1].trim() : '',
+    visual:   visualMatch   ? visualMatch[1].trim()   : '',
+  }
+}
+
+// ── Component ─────────────────────────────────────────────────────────────────
 function App() {
-  const [topic, setTopic] = useState('')
+  const [topic,    setTopic]    = useState('')
   const [platform, setPlatform] = useState('Facebook')
-  const [tone, setTone] = useState('professional')
-  const [result, setResult] = useState('')
-  const [loading, setLoading] = useState(false)
+  const [tone,     setTone]     = useState('professional')
+  const [result,   setResult]   = useState(null)   // { caption, hashtags, visual }
+  const [error,    setError]    = useState('')
+  const [loading,  setLoading]  = useState(false)
 
   const handleGenerate = async () => {
-    if (!topic) {
-      alert("Please enter a topic!");
-      return;
+    if (!topic.trim()) {
+      setError('⚠️  Please enter a topic or idea first.')
+      return
     }
-    setLoading(true);
-    setResult('');
-    
+    setLoading(true)
+    setResult(null)
+    setError('')
+
     try {
       const response = await fetch('http://127.0.0.1:8000/generate', {
-        method: 'POST',
+        method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ topic: topic, platform: platform, tone: tone })
-      });
-      
-      const data = await response.json();
-      setResult(data.data);
-    } catch (error) {
-      console.error("Error:", error);
-      setResult("❌ Error: Cannot connect to Agent server.");
+        body:    JSON.stringify({ topic: topic.trim(), platform, tone }),
+      })
+      const data = await response.json()
+      setResult(parseResult(data.data))
+    } catch {
+      setError('❌  Could not connect to the Agent server. Make sure the backend (app.py) is running on port 8000.')
     }
-    
-    setLoading(false);
+
+    setLoading(false)
   }
 
+  // Hashtag chips
+  const hashtagChips = result?.hashtags
+    ? result.hashtags.split(/\s+/).filter(Boolean)
+    : []
+
   return (
-    <div style={{ padding: '20px', maxWidth: '600px', margin: 'auto', textAlign: 'center', color: '#fff' }}>
-      <h1>🤖 Rule-Based Content Agent</h1>
-      <p>Give the agent inputs, and it will use its logic to create a post!</p>
+    <div className="app-wrapper">
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', textAlign: 'left', backgroundColor: '#1a1a1a', padding: '20px', borderRadius: '10px' }}>
-        
-        {/* Sensor 1: الفكرة */}
-        <label>📌 Topic / Idea:</label>
-        <input 
-          type="text" 
-          value={topic} 
-          onChange={(e) => setTopic(e.target.value)} 
-          placeholder="مثال: الذكاء الاصطناعي، المذاكرة، البرمجة..."
-          style={{ padding: '10px', borderRadius: '5px', fontSize: '16px' }}
-        />
+      {/* ── Header ── */}
+      <header className="app-header">
+        <div className="header-badge">🤖 Intelligent Agent · PEAS Model</div>
+        <h1>Social Media Content Agent</h1>
+        <p>
+          Give the agent your idea, target platform, and tone — it will reason
+          about your requirements and generate a ready-to-publish post.
+        </p>
+      </header>
 
-        {/* Sensor 2: المنصة */}
-        <label>📱 Platform:</label>
-        <select value={platform} onChange={(e) => setPlatform(e.target.value)} style={{ padding: '10px', borderRadius: '5px', fontSize: '16px' }}>
-          <option value="Facebook">Facebook</option>
-          <option value="Twitter">Twitter</option>
-          <option value="Instagram">Instagram</option>
-        </select>
+      {/* ── Sensors Card ── */}
+      <div className="card">
+        <div className="card-title">⚡ Sensor Inputs — Agent Perception</div>
 
-        {/* Sensor 3: أسلوب الكتابة */}
-        <label>🎭 Tone / Style:</label>
-        <select value={tone} onChange={(e) => setTone(e.target.value)} style={{ padding: '10px', borderRadius: '5px', fontSize: '16px' }}>
-          <option value="professional">رسمي واحترافي (Professional)</option>
-          <option value="funny">ساخر ومضحك (Funny)</option>
-        </select>
+        <div className="field-group">
+
+          {/* Topic */}
+          <div className="field">
+            <label>📌 Topic / Idea</label>
+            <input
+              type="text"
+              value={topic}
+              onChange={e => { setTopic(e.target.value); setError('') }}
+              placeholder="e.g. Artificial Intelligence, productivity tips, healthy eating…"
+              onKeyDown={e => e.key === 'Enter' && handleGenerate()}
+            />
+          </div>
+
+          {/* Platform */}
+          <div className="field">
+            <label>📱 Target Platform</label>
+            <div className="platform-grid">
+              {PLATFORMS.map(p => (
+                <button
+                  key={p.value}
+                  className={`platform-btn${platform === p.value ? ' active' : ''}`}
+                  onClick={() => setPlatform(p.value)}
+                >
+                  <span className="platform-icon">{p.icon}</span>
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Tone */}
+          <div className="field">
+            <label>🎭 Writing Tone</label>
+            <div className="tone-grid">
+              {TONES.map(t => (
+                <button
+                  key={t.value}
+                  className={`tone-btn${tone === t.value ? ' active' : ''}`}
+                  onClick={() => setTone(t.value)}
+                >
+                  <span className="tone-icon">{t.icon}</span>
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Generate */}
+        <button className="btn-generate" onClick={handleGenerate} disabled={loading}>
+          {loading
+            ? <><div className="spinner" /> Agent is reasoning…</>
+            : <>✨ Generate Post</>}
+        </button>
       </div>
 
-      <button 
-        onClick={handleGenerate} 
-        disabled={loading}
-        style={{ marginTop: '20px', padding: '12px 25px', backgroundColor: '#646cff', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '16px', fontWeight: 'bold' }}
-      >
-        {loading ? 'Agent is thinking...' : 'Let Agent Create Post'}
-      </button>
+      {/* ── Error ── */}
+      {error && <div className="error-card">{error}</div>}
 
-      {/* Actuator: المخرجات */}
+      {/* ── Actuator Output ── */}
       {result && (
-        <div style={{ marginTop: '30px', padding: '20px', backgroundColor: '#2a2a2a', borderRadius: '10px', textAlign: 'left', borderLeft: '5px solid #646cff' }}>
-          <h3 style={{ marginTop: 0, color: '#646cff' }}>Agent Output:</h3>
-          <p style={{ whiteSpace: 'pre-wrap', lineHeight: '1.6', fontSize: '16px' }}>{result}</p>
+        <div className="result-card">
+          <div className="result-header">
+            <div className="result-dot" />
+            <h3>🎯 Agent Output — Actuator Actions</h3>
+          </div>
+
+          {/* Caption */}
+          <div className="result-section">
+            <div className="result-section-title">📝 Caption</div>
+            <p>{result.caption}</p>
+          </div>
+
+          {/* Hashtags */}
+          {hashtagChips.length > 0 && (
+            <div className="result-section">
+              <div className="result-section-title">#️⃣ Hashtags</div>
+              <div className="hashtags-wrap">
+                {hashtagChips.map((tag, i) => (
+                  <span key={i} className="hashtag-chip">{tag}</span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Visual Concept */}
+          {result.visual && (
+            <div className="result-section">
+              <div className="result-section-title">🎨 Visual Concept</div>
+              <p>{result.visual}</p>
+            </div>
+          )}
         </div>
       )}
+
+      {/* ── PEAS Summary Bar ── */}
+      <div className="peas-bar">
+        <div className="peas-item">
+          <span className="peas-label">Performance</span>
+          <span className="peas-value">Content quality & relevance</span>
+        </div>
+        <div className="peas-item">
+          <span className="peas-label">Environment</span>
+          <span className="peas-value">User + Social platforms</span>
+        </div>
+        <div className="peas-item">
+          <span className="peas-label">Actuators</span>
+          <span className="peas-value">Post · Hashtags · Visual</span>
+        </div>
+        <div className="peas-item">
+          <span className="peas-label">Sensors</span>
+          <span className="peas-value">Topic · Platform · Tone</span>
+        </div>
+      </div>
+
     </div>
   )
 }

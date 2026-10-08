@@ -1,9 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-import random
 
-app = FastAPI()
+app = FastAPI(title="Social Media Content Agent")
 
 app.add_middleware(
     CORSMiddleware,
@@ -13,71 +12,120 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Sensors: البيانات اللي الـ Agent هيستقبلها
+# ── Sensors: data the Agent receives ─────────────────────────────────────────
 class PostRequest(BaseModel):
     topic: str
     platform: str
     tone: str
 
-# بناء الـ Agent 
+# ── Intelligent Agent ─────────────────────────────────────────────────────────
 class SocialMediaAgent:
+    """
+    A rule-based intelligent agent that applies the PEAS model:
+      Performance  – quality and relevance of generated content
+      Environment  – user input and selected social media platform
+      Actuators    – caption, hashtags, visual concept
+      Sensors      – topic, platform, tone
+    """
+
     def __init__(self):
-        # قاعدة المعرفة (Knowledge Base) للـ Agent
+        # ── Knowledge Base: caption templates ────────────────────────────────
         self.templates = {
             "Facebook": {
-                "funny": "مين فينا مش بيعاني من {topic}؟ 😂 شاركونا مواقفكم في الكومنتات!",
-                "professional": "موضوع {topic} أصبح من أهم النقاط التي يجب التركيز عليها في مجتمعنا اليوم. ما رأيكم؟",
+                "funny": (
+                    "Who else can totally relate to {topic}? 😂 Drop your funniest experience "
+                    "in the comments — let's see who's been through the most! 👇"
+                ),
+                "professional": (
+                    "{topic} is shaping the way we think and work today. "
+                    "Understanding it isn't optional anymore — it's essential. "
+                    "What's your take? Share your thoughts below. 💬"
+                ),
             },
             "Twitter": {
-                "funny": "حرفياً أنا لما أفكر في {topic} 🤡 #ضحك #{topic_nospace}",
-                "professional": "نقطة سريعة للنقاش: {topic} لها تأثير كبير على إنتاجيتنا. #{topic_nospace}",
+                "funny": (
+                    "Me pretending I understand {topic} while absolutely losing it internally 🤡\n"
+                    "#{topic_tag} #RelatableContent #TrueStory"
+                ),
+                "professional": (
+                    "Quick thought: {topic} is one of the most impactful trends right now.\n"
+                    "Are you paying attention? #{topic_tag} #Innovation #FutureForward"
+                ),
             },
             "Instagram": {
-                "funny": "حالي مع {topic} 🤪 swipe left عشان تشوفوا الكارثة ⬅️ ✨",
-                "professional": "سر النجاح في التعامل مع {topic} 💡 (اقرأ الكابشن) 👇",
-            }
+                "funny": (
+                    "POV: You thought {topic} would be easy 😅✨\n"
+                    "Swipe left to see the chaos ⬅️\n"
+                    "Save this for anyone who needs a laugh today 💀"
+                ),
+                "professional": (
+                    "The secret to mastering {topic} isn't talent — it's consistency. 💡\n"
+                    "Read the caption for the full breakdown 👇\n"
+                    "Follow for more insights like this ✨"
+                ),
+            },
         }
-        
+
+        # ── Knowledge Base: visual concept hints ─────────────────────────────
         self.visual_rules = {
-            "Facebook": "نصيحة للمصمم: استخدم صورة تفاعلية مكتوب عليها سؤال للنقاش.",
-            "Twitter": "نصيحة للمصمم: استخدم ميم (Meme) أو صورة جيف (GIF) سريعة.",
-            "Instagram": "نصيحة للمصمم: استخدم كاروسيل (صور متعددة) بتصميم جذاب ومريح للعين."
+            "Facebook": (
+                "Designer tip: Use an engaging image with a bold question overlay to spark discussion. "
+                "Warm, relatable visuals perform best on Facebook."
+            ),
+            "Twitter": (
+                "Designer tip: A sharp meme, a data chart, or a short GIF works great. "
+                "Keep it punchy and immediately understandable at a glance."
+            ),
+            "Instagram": (
+                "Designer tip: Create a carousel (3–5 slides) with clean typography and a consistent color palette. "
+                "The first slide should hook the viewer; the last should include a clear call-to-action."
+            ),
         }
 
-    # Reasoning: عملية التفكير واتخاذ القرار
-    def generate_post(self, topic, platform, tone):
-        topic_nospace = topic.replace(" ", "_")
-        
-        # اختيار القالب المناسب بناء على المعطيات
+    # ── Reasoning: agent decision-making ─────────────────────────────────────
+    def generate_post(self, topic: str, platform: str, tone: str) -> str:
+        topic_tag = topic.strip().replace(" ", "")
+
+        # Select the best template based on platform + tone
         if platform in self.templates and tone in self.templates[platform]:
-            caption = self.templates[platform][tone].format(topic=topic, topic_nospace=topic_nospace)
+            caption = self.templates[platform][tone].format(
+                topic=topic,
+                topic_tag=topic_tag,
+            )
         else:
-            caption = f"بوست عن {topic} بأسلوب {tone} على منصة {platform}."
-        
-        # اختيار الصورة المناسبة
-        visual = self.visual_rules.get(platform, "صورة تعبيرية عن الموضوع.")
-        
-        # ابتكار الهاشتاجات
-        hashtags = f"#{topic_nospace} #تريند #تفاعل"
+            caption = (
+                f"Here's a post about {topic} crafted for {platform} "
+                f"in a {tone} tone. Adapt and share!"
+            )
 
-        # Actuator: المخرجات النهائية
-        final_result = f"""
-📝 Caption: 
-{caption}
+        # Determine the visual concept
+        visual = self.visual_rules.get(
+            platform,
+            "Use a clear, high-quality image that represents the topic visually."
+        )
 
-#️⃣ Hashtags: 
-{hashtags}
+        # Generate contextual hashtags
+        hashtags = f"#{topic_tag} #Trending #SocialMedia #{platform}"
 
-🎨 Visual Concept: 
-{visual}
-        """
-        return final_result
+        # ── Actuator: build final output ──────────────────────────────────────
+        return (
+            f"📝 Caption:\n{caption}\n\n"
+            f"#️⃣ Hashtags:\n{hashtags}\n\n"
+            f"🎨 Visual Concept:\n{visual}"
+        )
 
-# إنشاء نسخة من الـ Agent
+# ── Instantiate the agent ─────────────────────────────────────────────────────
 agent = SocialMediaAgent()
 
 @app.post("/generate")
 def generate_content(request: PostRequest):
-    # إرسال المعطيات للـ Agent عشان يبتكر البوست
-    response = agent.generate_post(request.topic, request.platform, request.tone)
-    return {"status": "success", "data": response}
+    """
+    Perception → Reasoning → Action
+    Receives sensor inputs, runs the agent, and returns actuator outputs.
+    """
+    result = agent.generate_post(
+        topic=request.topic,
+        platform=request.platform,
+        tone=request.tone,
+    )
+    return {"status": "success", "data": result}
