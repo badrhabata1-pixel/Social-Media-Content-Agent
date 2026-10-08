@@ -1,5 +1,3 @@
-fastapi
-uvicorn
 streamlit
 langchain
 python-dotenv
