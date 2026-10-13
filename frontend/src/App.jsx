@@ -26,8 +26,8 @@ function App() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // ── API Call ────────────────────────────────────────────────────────────────
-  const handleGenerate = async () => {
+  // ── Simulated API Call (For Frontend Testing) ──────────────────────────────
+  const handleGenerate = () => {
     if (!topic.trim()) {
       setError('Please enter a topic or idea first.');
       return;
@@ -36,19 +36,26 @@ function App() {
     setResult(null);
     setError('');
 
-    try {
-      const response = await fetch('http://127.0.0.1:8000/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ topic: topic.trim(), platform, tone }),
-      });
-      const data = await response.json();
-      setResult(parseResult(data.data));
-    } catch {
-      setError('Could not connect to the Agent server. Make sure the backend (app.py) is running on port 8000.');
-    }
+    // محاكاة للاتصال بالباك اند (انتظار ثانيتين)
+    setTimeout(() => {
+      // النص الوهمي اللي كأنه جاي من الباك اند
+      const mockBackendResponse = `
+📝 Caption:
+Are you ready to explore the world of ${topic}? 🚀
+Whether you're an expert or just starting out, this is something you don't want to miss. We've tailored this specifically for our ${platform} community. Let us know your thoughts in the comments below! 👇
+(Tone applied: ${tone})
 
-    setLoading(false);
+#️⃣ Hashtags:
+#${topic.replace(/\s+/g, '')} #${platform} #Trending #AI
+
+🎨 Visual Concept:
+A high-quality, engaging graphic representing '${topic}', optimized for ${platform} dimensions, with a ${tone} aesthetic.
+      `;
+
+      // تحويل النص وعرضه في الواجهة
+      setResult(parseResult(mockBackendResponse));
+      setLoading(false);
+    }, 2000); // 2000 مللي ثانية = ثانيتين
   };
 
   const handleCopy = () => {
