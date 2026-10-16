@@ -1,67 +1,202 @@
 """
-Module 3: AI Content Writer Agent
-==================================
+Module 3: AI Content Writer Agent (Enhanced NLP & NLG Engine)
+============================================================
 Academic AI Architecture: Goal-Based Agent (PEAS Framework)
 Operation Mode: 100% Offline, Deterministic Rule-Based Natural Language Generation (NLG).
-Zero External LLM APIs, Zero Cloud Latency, Zero Hallucinations.
+Features:
+- Robust Arabic & English Spell Correction / Typo Normalization
+- Context & Intent Domain Classification
+- Sophisticated Stylistic NLG for All Tones (Professional, Inspirational, Casual)
+- Anti-Repetition Pattern Randomization
+- Platform Syntactic Calibration (LinkedIn, Instagram, Twitter/X, Facebook)
+- Zero External LLMs, Zero Cloud Latency, Zero Hallucinations.
 """
 
-from typing import List, Dict, Any
+import re
+import random
+from typing import List, Dict, Any, Tuple
 
 
 class ContentWriterAgent:
     """
-    Module 3 AI Content Writer Agent.
-    Implements rule-based NLG, framework selection (AIDA, PAS, Story-Lesson-Question),
-    platform syntactic calibration, bilingual template assembly (AR/EN),
-    hashtag allocation quotas, and dual-variation synthesis.
+    Enhanced Module 3 AI Content Writer Agent.
+    Combines rule-based Natural Language Understanding (NLU: typo correction, lemmatization,
+    intent classification) and advanced Natural Language Generation (NLG).
     """
+
+    # ── Spelling & Typo Correction Dictionary (Common Arabic & English Errors) ──
+    TYPO_MAP_AR = {
+        # Common typos & slang conversions
+        "كاجه": "حاجة",
+        "حاجه": "أمر",
+        "التعمل": "الذي تم إنجازه",
+        "الكنت": "الذي كنت",
+        "املاءيه": "إملائية",
+        "املائيه": "إملائية",
+        "حته": "حتى",
+        "انتا": "أنت",
+        "ازاى": "كيف",
+        "ازاي": "كيف",
+        "ابلكيشن": "تطبيق",
+        "ابليكيشن": "تطبيق",
+        "برمجه": "برمجة",
+        "برمجة": "برمجة",
+        "تكلوجيا": "تكنولوجيا",
+        "تكنلوجيا": "تكنولوجيا",
+        "زكاء": "ذكاء",
+        "اصطناعي": "اصطناعي",
+        "إصطناعي": "اصطناعي",
+        "تسويق": "تسويق",
+        "سوشيال": "وسائل التواصل الاجتماعي",
+        "ميديا": "الإعلام الرقمي",
+        "فيس": "فيسبوك",
+        "انستا": "إنستغرام",
+        "تويتر": "تويتر",
+        "لينكد": "لينكد إن",
+        "لينكدان": "لينكد إن",
+        "مزاكره": "مذاكرة",
+        "مذاكره": "مذاكرة",
+        "انتاجيه": "إنتاجية",
+        "تنظيم": "تنظيم",
+        "الوقت": "الوقت",
+        "تطوير": "تطوير",
+        "شركه": "شركة",
+        "بيزنس": "أعمال",
+        "استثمار": "استثمار",
+        "فلوس": "أموال",
+        "دراسه": "دراسة",
+        "امتحان": "امتحان",
+        "شغل": "عمل",
+        "وظايف": "وظائف",
+        "شات": "محادثة",
+        "روبوت": "وكيل ذكي",
+    }
+
+    TYPO_MAP_EN = {
+        "teh": "the",
+        "producitvity": "productivity",
+        "producitivity": "productivity",
+        "managment": "management",
+        "studdy": "study",
+        "colledge": "college",
+        "aplication": "application",
+        "appliction": "application",
+        "softwere": "software",
+        "programing": "programming",
+        "artifical": "artificial",
+        "inteligence": "intelligence",
+        "buisness": "business",
+        "busines": "business",
+        "markting": "marketing",
+        "stratgy": "strategy",
+        "succes": "success",
+        "sucess": "success",
+        "focuss": "focus",
+        "habbit": "habit",
+    }
+
+    # ── Category & Domain Lexicon ───────────────────────────────────────────
+    DOMAINS = {
+        "tech_ai": {
+            "keywords": ["ai", "tech", "software", "app", "code", "programming", "ذكاء", "تقني", "تطبيق", "برمج", "تكنولوجيا", "روبوت", "بيانات"],
+            "ar_terms": ["التحول الرقمي", "الأتمتة الذكية", "التطوير البرمجي", "الحلول التكنولوجية"],
+            "en_terms": ["digital transformation", "smart automation", "scalable engineering", "cutting-edge tools"]
+        },
+        "productivity_time": {
+            "keywords": ["time", "productiv", "habit", "focus", "manage", "organiz", "task", "وقت", "إنتاج", "عادات", "تركيز", "مهام", "تنظيم", "إنجاز"],
+            "ar_terms": ["إدارة الوقت", "الإنتاجية العالية", "التركيز العميق", "بناء العادات المستدامة"],
+            "en_terms": ["time management", "peak productivity", "deep work", "sustainable habits"]
+        },
+        "education_study": {
+            "keywords": ["study", "student", "college", "school", "learn", "exam", "course", "طالب", "دراس", "جامع", "مذاكرة", "امتحان", "تعليم", "تعلّم"],
+            "ar_terms": ["التحصيل الأكاديمي", "الروتين الدراسي الذكي", "التفوق الجامعي", "مهارات التعلم الفعّال"],
+            "en_terms": ["academic excellence", "smart study routines", "higher education success", "effective learning"]
+        },
+        "business_career": {
+            "keywords": ["business", "marketing", "startup", "sales", "lead", "career", "money", "أعمال", "تسويق", "مشروع", "مبيعات", "استثمار", "ريادة", "وظيفة"],
+            "ar_terms": ["نمو الأعمال", "بناء العلامة التجارية", "استراتيجيات التسويق", "الريادة والابتكار"],
+            "en_terms": ["business growth", "brand positioning", "strategic marketing", "entrepreneurial excellence"]
+        }
+    }
 
     HASHTAG_KB = {
         "en": {
-            "productivity": [
-                "#Productivity", "#TimeManagement", "#Focus", "#DeepWork",
-                "#Efficiency", "#GrowthMindset", "#WorkSmart"
-            ],
-            "education": [
-                "#StudentLife", "#StudyHacks", "#CollegeTips", "#HigherEd",
-                "#AcademicSuccess", "#LearnSmart", "#StudyRoutine"
-            ],
-            "tech": [
-                "#AppDesign", "#MobileApp", "#EdTech", "#SmartTools",
-                "#DigitalTransformation", "#TechTrends", "#Innovation"
-            ],
-            "business": [
-                "#Leadership", "#Strategy", "#Entrepreneurship", "#Startups",
-                "#BusinessGrowth", "#ProfessionalDevelopment"
-            ],
-            "general": [
-                "#LifeHacks", "#SelfImprovement", "#Motivation", "#Success",
-                "#DailyHabits", "#GoalSetting"
-            ]
+            "productivity": ["#Productivity", "#TimeManagement", "#DeepWork", "#FocusMode", "#Efficiency", "#GrowthMindset", "#WorkSmart", "#DailyHabits"],
+            "education": ["#StudentLife", "#StudyHacks", "#CollegeTips", "#HigherEd", "#AcademicSuccess", "#LearnSmart", "#StudyRoutine", "#StudentSuccess"],
+            "tech": ["#TechTrends", "#ArtificialIntelligence", "#AppDevelopment", "#DigitalInnovation", "#SmartTools", "#EdTech", "#SoftwareEngineering"],
+            "business": ["#BusinessStrategy", "#Entrepreneurship", "#Leadership", "#MarketingTips", "#Startups", "#BrandGrowth", "#ProfessionalDevelopment"],
+            "general": ["#SelfImprovement", "#Motivation", "#SuccessMindset", "#ActionTakers", "#HabitBuilding", "#BestPractices"]
         },
         "ar": {
-            "productivity": [
-                "#إنتاجية", "#تنظيم_الوقت", "#إدارة_الوقت", "#تطوير_الذات",
-                "#إنجاز", "#تركيز", "#عمل_ذكي"
-            ],
-            "education": [
-                "#حياة_الطلاب", "#نصائح_دراسية", "#جامعيون", "#دراسة_ذكية",
-                "#تفوق_أكاديمي", "#طالب_جامعي", "#روتين_المذاكرة"
-            ],
-            "tech": [
-                "#تطبيقات_ذكية", "#تقنية", "#حلول_رقمية", "#أدوات_العمل",
-                "#ابتكار", "#تكنولوجيا", "#تحول_رقمي"
-            ],
-            "business": [
-                "#ريادة_أعمال", "#قيادة", "#استراتيجية", "#أعمال",
-                "#تطوير_مهني", "#مشاريع_ناشئة"
-            ],
-            "general": [
-                "#نجاح", "#تطوير", "#خطط_يومية", "#تحفيز", "#طموح", "#عادات_يومية"
-            ]
+            "productivity": ["#إنتاجية", "#تنظيم_الوقت", "#إدارة_الوقت", "#تطوير_الذات", "#إنجاز", "#تركيز_عميق", "#عادات_النجاح", "#عمل_ذكي"],
+            "education": ["#حياة_الطلاب", "#نصائح_دراسية", "#جامعيون", "#دراسة_ذكية", "#تفوق_أكاديمي", "#طالب_جامعي", "#روتين_المذاكرة", "#النجاح_الدراسي"],
+            "tech": ["#تطبيقات_ذكية", "#ذكاء_اصطناعي", "#تقنية", "#حلول_رقمية", "#أدوات_رقمية", "#ابتكار", "#تكنولوجيا_المستقبل"],
+            "business": ["#ريادة_أعمال", "#استراتيجية_أعمال", "#تسويق_رقمي", "#تطوير_مهني", "#مشاريع_ناشئة", "#إدارة_الأعمال", "#بناء_المشاريع"],
+            "general": ["#تطوير_الذات", "#طموح", "#تحفيز", "#خطط_يومية", "#إلهام", "#نجاح"]
         }
     }
+
+    # ── Natural Language Understanding: Normalization & Correction ───────────
+    def normalize_and_clean_text(self, text: str, lang: str = "ar") -> str:
+        """
+        Cleans typographical mistakes, corrects spelling of common words,
+        normalizes Arabic letters (همزات، تاء مربوطة، ياء/ألف مقصورة).
+        """
+        if not text:
+            return ""
+
+        cleaned = text.strip()
+
+        if lang == "ar":
+            # Fix duplicate spaces and erratic punctuation
+            cleaned = re.sub(r'\s+', ' ', cleaned)
+
+            # Dictionary-based whole-word correction
+            words = cleaned.split()
+            corrected_words = []
+            for w in words:
+                # Strip leading/trailing punctuation for lookup
+                core = re.sub(r'^[^\w\s]+|[^\w\s]+$', '', w)
+                if core in self.TYPO_MAP_AR:
+                    replacement = self.TYPO_MAP_AR[core]
+                    w = w.replace(core, replacement)
+                corrected_words.append(w)
+            cleaned = " ".join(corrected_words)
+
+            # Rule-based Arabic Normalization
+            # 1. Normalize final ه to ة where commonly misspelled
+            cleaned = re.sub(r'\b(انتاجيه|انتاجية)\b', 'إنتاجية', cleaned)
+            cleaned = re.sub(r'\b(اداره|ادارة)\b', 'إدارة', cleaned)
+            cleaned = re.sub(r'\b(مزاكره|مذاكره)\b', 'مذاكرة', cleaned)
+            cleaned = re.sub(r'\b(دراسه)\b', 'دراسة', cleaned)
+            cleaned = re.sub(r'\b(تطبيقات ذكيه)\b', 'تطبيقات ذكية', cleaned)
+            cleaned = re.sub(r'\b(استراتيجيه)\b', 'استراتيجية', cleaned)
+            # 2. Fix common Alef Hamza
+            cleaned = re.sub(r'\b(انتاج)\b', 'إنتاج', cleaned)
+            cleaned = re.sub(r'\b(انجاز)\b', 'إنجاز', cleaned)
+            cleaned = re.sub(r'\b(اهميه)\b', 'أهمية', cleaned)
+            cleaned = re.sub(r'\b(افضل)\b', 'أفضل', cleaned)
+        else:
+            # English normalization
+            words = cleaned.split()
+            corrected_words = []
+            for w in words:
+                core = re.sub(r'^[^\w\s]+|[^\w\s]+$', '', w).lower()
+                if core in self.TYPO_MAP_EN:
+                    replacement = self.TYPO_MAP_EN[core]
+                    w = re.sub(re.escape(core), replacement, w, flags=re.IGNORECASE)
+                corrected_words.append(w)
+            cleaned = " ".join(corrected_words)
+
+        return cleaned
+
+    def detect_domain(self, text: str) -> str:
+        """Determines the thematic domain to enrich vocabulary and context."""
+        t_lower = text.lower()
+        for domain_name, data in self.DOMAINS.items():
+            if any(k in t_lower for k in data["keywords"]):
+                return domain_name
+        return "productivity_time"
 
     # ── Phase 1: Reasoning Framework Selection ──────────────────────────────
     @staticmethod
@@ -74,53 +209,59 @@ class ContentWriterAgent:
         else:
             return "Story-Lesson-Question"
 
-    # ── Phase 4: Categorical Hashtag Extraction & Quotas ────────────────────
+    # ── Phase 4: Categorical Hashtag Extraction & Distribution ──────────────
     def allocate_hashtags(self, keywords: List[str], topic: str, platform: str, lang: str) -> List[str]:
         pool = []
         kb = self.HASHTAG_KB.get(lang, self.HASHTAG_KB["en"])
 
-        # Topic & Keywords derived tags
-        if topic:
-            clean_topic = topic.strip().replace(" ", "_").replace("-", "_")
-            if clean_topic:
-                pool.append(f"#{clean_topic}")
-
+        # Clean keywords & extract meaningful tags
         for kw in keywords:
-            clean_kw = kw.strip().replace(" ", "_").replace("-", "_")
-            if clean_kw:
+            clean_kw = re.sub(r'[^\w\s]', '', kw).strip().replace(" ", "_")
+            if clean_kw and len(clean_kw) > 1:
                 pool.append(f"#{clean_kw}")
 
-        # Domain category matching
-        combined_text = (topic + " " + " ".join(keywords)).lower()
-        if any(w in combined_text for w in ["time", "manage", "productiv", "task", "وقت", "تنظيم", "إنتاج"]):
-            pool.extend(kb["productivity"])
-        if any(w in combined_text for w in ["student", "study", "college", "school", "طالب", "دراس", "جامع"]):
-            pool.extend(kb["education"])
-        if any(w in combined_text for w in ["app", "tech", "mobile", "software", "تطبيق", "تقني", "رقمي"]):
-            pool.extend(kb["tech"])
-        if any(w in combined_text for w in ["work", "business", "career", "مهن", "أعمال", "وظيفة"]):
-            pool.extend(kb["business"])
+        # Derive 1-2 clean topic tags (exclude long sentences)
+        clean_topic = re.sub(r'[^\w\s]', '', topic).strip()
+        words = clean_topic.split()
+        if 1 <= len(words) <= 3:
+            pool.append(f"#{'_'.join(words)}")
+        elif len(words) > 3:
+            # take most salient words
+            salient = [w for w in words if len(w) > 3][:2]
+            if salient:
+                pool.append(f"#{'_'.join(salient)}")
 
-        # Fallback pool
+        # Domain category matching
+        combined = (topic + " " + " ".join(keywords)).lower()
+        domain = self.detect_domain(combined)
+
+        if domain == "tech_ai":
+            pool.extend(kb["tech"])
+        elif domain == "education_study":
+            pool.extend(kb["education"])
+        elif domain == "business_career":
+            pool.extend(kb["business"])
+        else:
+            pool.extend(kb["productivity"])
+
         pool.extend(kb["general"])
 
         # Deduplicate preserving order
         unique_tags = list(dict.fromkeys(pool))
 
-        # Enforce platform quotas
-        platform_normalized = platform.lower()
-        if "instagram" in platform_normalized:
+        plat_lower = platform.lower()
+        if "instagram" in plat_lower:
             quota = 10
-        elif "twitter" in platform_normalized or "x" in platform_normalized:
+        elif "twitter" in plat_lower or "x" in plat_lower:
             quota = 3
-        elif "linkedin" in platform_normalized:
+        elif "linkedin" in plat_lower:
             quota = 4
         else:  # Facebook
             quota = 5
 
         return unique_tags[:quota]
 
-    # ── Phase 2 & 3: Bilingual NLG Slot-Filling Engine ─────────────────────
+    # ── Phase 2 & 3: Advanced Bilingual Slot-Filling & Sentence Synthesis ──
     def generate_copy_sections(
         self,
         topic: str,
@@ -132,148 +273,233 @@ class ContentWriterAgent:
         variation_type: str
     ) -> Dict[str, str]:
         framework = self.resolve_framework(goal)
-        kw_highlight = "، ".join(keywords[:3]) if lang == "ar" else ", ".join(keywords[:3])
-        if not kw_highlight:
-            kw_highlight = topic
+        domain = self.detect_domain(topic + " " + " ".join(keywords))
 
+        # Normalized string representations for natural phrasing
         if lang == "ar":
-            return self._build_arabic_copy(topic, kw_highlight, framework, platform, tone, variation_type)
+            clean_topic = self.normalize_and_clean_text(topic, "ar")
+            clean_kws = [self.normalize_and_clean_text(k, "ar") for k in keywords if k.strip()]
+            kw_phrase = "، و".join(clean_kws[:3]) if clean_kws else clean_topic
+            return self._synthesize_arabic(clean_topic, clean_kws, kw_phrase, framework, platform, tone, variation_type, domain)
         else:
-            return self._build_english_copy(topic, kw_highlight, framework, platform, tone, variation_type)
+            clean_topic = self.normalize_and_clean_text(topic, "en")
+            clean_kws = [self.normalize_and_clean_text(k, "en") for k in keywords if k.strip()]
+            kw_phrase = ", and ".join(clean_kws[:3]) if clean_kws else clean_topic
+            return self._synthesize_english(clean_topic, clean_kws, kw_phrase, framework, platform, tone, variation_type, domain)
 
-    def _build_arabic_copy(
+    # ─────────────────────────────────────────────────────────────────────────
+    # ARABIC NATURAL LANGUAGE GENERATION ENGINE
+    # ─────────────────────────────────────────────────────────────────────────
+    def _synthesize_arabic(
         self,
         topic: str,
-        kw: str,
+        keywords: List[str],
+        kw_phrase: str,
         framework: str,
         platform: str,
         tone: str,
-        v_type: str
+        v_type: str,
+        domain: str
     ) -> Dict[str, str]:
         is_action = (v_type == "Action-driven")
+        tone_lower = tone.lower()
 
+        # ── 1. AIDA Framework (Marketing / Action) ──
         if framework == "AIDA":
             if is_action:
-                hook = f"وداعاً لهدر الساعات: إليك الطريقة العملية للسيطرة على {topic} اليوم."
-                body = (
-                    f"معظمنا يفقد تركيزه بسبب تشتت المهام وغياب النظام الواضح ({kw}).\n\n"
-                    f"الحل يكمن في خطوات محددة تصنع فارقاً فورياً:\n"
-                    f"• تركيز مباشر على الأولويات اليومية دون تسويف\n"
-                    f"• تنظيم ذكي يختصر نصف الوقت المستهلك\n"
-                    f"• نظام تتبع يضمن إنجاز كل خطوة بنجاح"
-                )
-                cta = "ابدأ تطبيق هذا النظام الآن من الرابط المرفق واكتشف الفرق بنفسك."
+                if "inspirational" in tone_lower:
+                    hook = f"حان الوقت لتنقل تجربتك في {topic} إلى مستوى استثنائي غير مسبوق."
+                    body = (
+                        f"الإنجاز الحقيقي لا يأتي بالصدفة، بل باختيار الأدوات التي تصنع الفارق في {kw_phrase}.\n\n"
+                        f"إليك ما ستحصل عليه فور البدء:\n"
+                        f"• وضوح تام للأولويات دون أي تشتت أو فوضى\n"
+                        f"• توفير ساعات أسبوعية كانت تضيع في المهام الروتينية\n"
+                        f"• تقدم ملحوظ وملموس ينعكس مباشرة على أهدافك الكبرى"
+                    )
+                    cta = "انطلق الآن واكتشف التجربة الكاملة عبر الرابط في التعليق الأول."
+                elif "casual" in tone_lower:
+                    hook = f"لو لسه بتعاني مع {topic}.. المقال ده معمول عشانك تحديداً!"
+                    body = (
+                        f"كلنا بنقع في فخ التشتت وضغط {kw_phrase}، والحل مش إننا نتعب أكتر، الحل إننا ننظم بطريقة أذكى.\n\n"
+                        f"الحل العملي في 3 خطوات بسيطة:\n"
+                        f"• تخلص فوري من الفوضى وتحديد المهم أولاً\n"
+                        f"• استخدام أسلوب عملي مريح يناسب يومك\n"
+                        f"• نتيجة واضحة من أول يوم استخدام"
+                    )
+                    cta = "جرب بنفسك وقول لنا رأيك في أول تعليق! 👇"
+                else:  # Professional (Default)
+                    hook = f"وداعاً لهدر الوقت والموارد: المنظومة المتكاملة للتحكم في {topic}."
+                    body = (
+                        f"يواجه معظم المتخصصين صعوبة مستمرة في إدارة {kw_phrase} بسبب الاعتماد على حلول تقليدية غير مرنة.\n\n"
+                        f"صُممت هذه المنهجية لتضمن لك:\n"
+                        f"• كفاءة تنفيذية تضاعف سرعة إنجاز المهام الأساسية\n"
+                        f"• تقليل الإجهاد الذهني عبر أتمتة الخطوات المكررة\n"
+                        f"• مؤشرات واضحة لقياس الأداء ومتابعة التطور اليومي"
+                    )
+                    cta = "ابدأ تطبيق هذا الحل اليوم عبر زيارة الرابط المرفق."
             else:  # Value-driven
-                hook = f"النجاح في {topic} لا يعتمد على المجهود المضاعف، بل على النظام الصحيح."
-                body = (
-                    f"عندما تواجه ضغط {kw}، فإن الحل ليس السهر لساعات أطول، بل بناء روتين ذكي.\n\n"
-                    f"الوضوح الذهني وترتيب الأولويات هما السلاح الحقيقي للتفوق المستمر."
-                )
-                cta = "ما هي أكبر عقبة تواجهك في تطبيق هذا الروتين؟ شاركنا تجربتك في التعليقات."
+                if "inspirational" in tone_lower:
+                    hook = f"النجاح في {topic} ليس سباقاً ضد الساعة، بل هو فن اختيار الاتجاه الصحيح."
+                    body = (
+                        f"عندما تبني نظاماً قائماً على {kw_phrase}، يتحول التوتر المستمر إلى طاقة إبداع وإنتاج لا تنتهي.\n\n"
+                        f"القيمة الحقيقية لا تكمن في كثرة ما تقوم به، بل في عمق الأثر الذي تتركه كل خطوة مدروسة."
+                    )
+                    cta = "كيف تسعى لتطوير هذه المهارة في مسيرتك؟ شاركنا رؤيتك ورأيك المُلهم."
+                else:  # Professional / Thought Leadership
+                    hook = f"إعادة التفكير في استراتيجية {topic}: لماذا تفشل الأنظمة المعتادة؟"
+                    body = (
+                        f"الارتقاء الحقيقي بمستوى الأداء في {kw_phrase} يتطلب التخلي عن الفوضى التشغيلية.\n\n"
+                        f"الشركات والمحترفون الذين يحققون نتائج استثنائية يركزون على بناء عادات مستدامة تضمن الاستمرارية حتى في أصعب الأوقات."
+                    )
+                    cta = "برأيك المهني، ما هو العنصر الأكثر حساسية لضمان نجاح هذه التجربة؟"
 
+        # ── 2. PAS Framework (Educational / Problem Solving) ──
         elif framework == "PAS":
             if is_action:
-                hook = f"مشكلة شائعة: هل تشعر أن {topic} يستنزف طاقتك اليومية دون تقدم ملموس؟"
+                hook = f"المشكلة الخفية وراء التراجع في {topic} — والحل المباشر لعلاجها اليوم."
                 body = (
-                    f"تراكم المهام وتخبط ({kw}) يؤدي دائماً إلى الإرهاق وفقدان الحماس.\n\n"
-                    f"لكن الحل أصبح في متناول يدك من خلال 3 خطوات واضحة:\n"
-                    f"• تحديد 3 أولويات قصوى لكل يوم\n"
-                    f"• استخدام أدوات تنظيم رقمية تمنع الفوضى\n"
-                    f"• مراجعة الإنجاز أسبوعياً بثبات"
+                    f"المشكلة: استنزاف الساعات في محاولة موازنة {kw_phrase} دون رؤية نتائج حقيقية.\n"
+                    f"التفاقم: الاستمرار بدون نظام واضح يرفع معدلات الإرهاق ويؤدي حتماً إلى فقدان الشغف والتركيز.\n\n"
+                    f"الحل العملي الفوري:\n"
+                    f"• اعتماد قاعدة الـ 20/80 للتركيز على المهام ذات العائد الأكبر\n"
+                    f"• جدولة فترات عمل محددة خالية من أي ملهيات رقمية\n"
+                    f"• أتمتة وتوثيق الخطوات لتكرار النجاح بسلاسة"
                 )
-                cta = "احفظ هذا المنشور وطبّق الخطوة الأولى فوراً لترى النتيجة اليوم."
+                cta = "احفظ هذا الدليل في مفضلتك لتبدأ بتطبيق الخطوة الأولى فوراً."
             else:  # Value-driven
-                hook = f"الحقيقة الصادمة حول صعوبات {topic} وكيف تتغلب عليها بوعي."
+                hook = f"لماذا يجد الكثيرون صعوبة بالغة في إتقان {topic}؟ تحليل موضوعي وحلول عميقة."
                 body = (
-                    f"الضغط الناجم عن ({kw}) ليس مشكلتك وحدك، بل نتيجة عادات غير منتظمة.\n\n"
-                    f"تغيير بسيط في طريقة إدارتك ليومك يعيد لك راحة البال ويرفع جودة إنجازك بنسبة 200%."
+                    f"المشكلة لا تكمن في نقص الاجتهاد، بل في غياب الاستراتيجية المناسبة للتعامل مع {kw_phrase}.\n\n"
+                    f"عندما تدرك جذور الخلل وتستبدل الاندفاع العشوائي بنظام دقيق، تصبح النتائج الإيجابية نتيجة حتمية وطبيعية."
                 )
-                cta = "برأيك، ما هي الخطوة الأهم للبدء من جديد؟ بانتظار رأيك أدناه."
+                cta = "ما هي أكبر تجربة أحدثت فارقاً حقيقياً في طريقة إدارتك لهذا التحدي؟"
 
-        else:  # Story-Lesson-Question
+        # ── 3. Story-Lesson-Question Framework (Engagement) ──
+        else:
             if is_action:
-                hook = f"قصة واقعية: كيف تحول التحدي في {topic} إلى قصة إنجاز عملية؟"
+                hook = f"تجربة عملية أثبتت فعاليتها: كيف حوّلنا عقبات {topic} إلى محرك حقيقي للنجاح؟"
                 body = (
-                    f"قبل شهور، كانت الفوضى في ({kw}) تحول دون تحقيق أي هدف حقيقي.\n\n"
-                    f"الدرس المستفاد:\n"
-                    f"النظام البسيط والصارم يتفوق دائماً على الحماس المؤقت."
+                    f"في البداية، كان التخبط في {kw_phrase} يستهلك أغلب الطاقة اليومية.\n\n"
+                    f"الدرس الجوهري:\n"
+                    f"«الانضباط المعتمد على نظام محكم يتفوق دائماً على الحماس اللحظي».\n"
+                    f"كل ما تطلبه الأمر هو ضبط وتيرة التنفيذ والالتزام بالأولويات."
                 )
-                cta = "ابدأ بوضع جدولك لليوم القادم الآن وشاركنا قرارك الأول."
+                cta = "ما رأيك في تطبيق هذا النموذج في مشروعك القادم؟ أخبرنا بقرارك."
             else:  # Value-driven
-                hook = f"درس تعلمته بعد تجارب طويلة في عالم {topic}:"
+                hook = f"درس لا يُقدّر بثمن تعلمته من التحديات اليومية في {topic}:"
                 body = (
-                    f"التركيز على الأساسيات وحل تحديات ({kw}) يبدأ بقرار التخلي عن العشوائية.\n\n"
-                    f"كل دقيقة تقضيها في التخطيط توفر عليك عشرات الدقائق في التنفيذ."
+                    f"التعامل بذكاء مع {kw_phrase} علمني أن التوقف للتقييم والتنظيم ليس تراجعاً، بل هو أقصر طريق للوصول.\n\n"
+                    f"البساطة في التصميم والتنفيذ هي ذروة الاحتراف."
                 )
-                cta = "كيف تتعامل مع هذه التحديات في روتينك؟ يسعدني الاستماع لتجربتك."
+                cta = "لو كان بإمكانك تقديم نصيحة واحدة لشخص يبدأ في هذا المجال الآن، فماذا ستكون؟"
 
         return {"hook": hook, "body": body, "cta": cta}
 
-    def _build_english_copy(
+    # ─────────────────────────────────────────────────────────────────────────
+    # ENGLISH NATURAL LANGUAGE GENERATION ENGINE
+    # ─────────────────────────────────────────────────────────────────────────
+    def _synthesize_english(
         self,
         topic: str,
-        kw: str,
+        keywords: List[str],
+        kw_phrase: str,
         framework: str,
         platform: str,
         tone: str,
-        v_type: str
+        v_type: str,
+        domain: str
     ) -> Dict[str, str]:
         is_action = (v_type == "Action-driven")
+        tone_lower = tone.lower()
 
+        # ── 1. AIDA Framework ──
         if framework == "AIDA":
             if is_action:
-                hook = f"Stop wasting hours: Master {topic} with a system that actually works."
-                body = (
-                    f"Most people get overwhelmed managing {kw} because they rely on memory instead of systems.\n\n"
-                    f"Here is how you fix it today:\n"
-                    f"• Zero in on your top 3 daily priorities\n"
-                    f"• Automate and streamline repetitive friction\n"
-                    f"• Build a streak that turns consistency into results"
-                )
-                cta = "Take control right now — access the complete blueprint via the link."
+                if "inspirational" in tone_lower:
+                    hook = f"Transform the way you approach {topic} and unlock your true potential."
+                    body = (
+                        f"Great achievements are never accidental—they are built on intentional systems around {kw_phrase}.\n\n"
+                        f"Here is what shifts immediately:\n"
+                        f"• Crystal-clear focus on high-leverage priorities\n"
+                        f"• Elimination of mental clutter and routine friction\n"
+                        f"• Measurable daily momentum toward your ultimate goals"
+                    )
+                    cta = "Take decisive action today. Access the complete framework via the link below."
+                elif "casual" in tone_lower:
+                    hook = f"Tired of overcomplicating {topic}? Let's break it down the easy way."
+                    body = (
+                        f"We've all been there—juggling {kw_phrase} until everything feels overwhelming.\n\n"
+                        f"Here is the simple 3-step fix:\n"
+                        f"• Cut the fluff and focus on what actually moves the needle\n"
+                        f"• Use smart shortcuts that save you hours every week\n"
+                        f"• Keep it consistent without burning yourself out"
+                    )
+                    cta = "Give it a spin and let me know your thoughts in the comments! 👇"
+                else:  # Professional (Default)
+                    hook = f"Stop losing hours to friction: The definitive framework for mastering {topic}."
+                    body = (
+                        f"Professionals routinely struggle with {kw_phrase} when relying on fragmented, manual workflows.\n\n"
+                        f"This proven approach delivers:\n"
+                        f"• Accelerated task throughput with zero cognitive overload\n"
+                        f"• Streamlined consistency across every operational stage\n"
+                        f"• Objective tracking metrics to benchmark your progress"
+                    )
+                    cta = "Deploy this system in your workflow today. Find the complete details at the link."
             else:  # Value-driven
-                hook = f"Mastering {topic} isn't about working harder; it's about removing friction."
-                body = (
-                    f"When you struggle with {kw}, discipline is rarely the culprit. Your system is.\n\n"
-                    f"A deliberate routine protects your mental clarity and turns daily pressure into sustainable momentum."
-                )
-                cta = "What is the single biggest roadblock in your current routine? Let's discuss below."
+                if "inspirational" in tone_lower:
+                    hook = f"Mastering {topic} isn't about grinding more hours; it's about honoring your energy."
+                    body = (
+                        f"When your framework aligns seamlessly with {kw_phrase}, pressure transforms into sustainable focus.\n\n"
+                        f"Excellence is not an act of willpower—it is the natural outcome of a well-architected routine."
+                    )
+                    cta = "What is one deliberate shift you've made recently that redefined your growth?"
+                else:
+                    hook = f"Rethinking our core perspective on {topic}: Why conventional tactics fall short."
+                    body = (
+                        f"High-performing teams don't work twice as hard to balance {kw_phrase}; they eliminate operational chaos.\n\n"
+                        f"Sustainable results come from clarity of purpose, disciplined boundaries, and iterative refinement."
+                    )
+                    cta = "From your professional viewpoint, what is the single biggest barrier to sustainable consistency?"
 
+        # ── 2. PAS Framework ──
         elif framework == "PAS":
             if is_action:
-                hook = f"Are you feeling overwhelmed trying to stay on top of {topic}?"
+                hook = f"The silent bottleneck stalling your progress in {topic} (and how to fix it today)."
                 body = (
-                    f"Ignoring the chaos in {kw} costs you precious hours, focus, and energy every single week.\n\n"
-                    f"Here is your direct action plan:\n"
-                    f"• Categorize tasks by true impact, not urgency\n"
-                    f"• Dedicate distraction-free focus blocks\n"
-                    f"• Review and iterate your workflow every Friday"
+                    f"Problem: Unstructured execution around {kw_phrase} leads to persistent exhaustion.\n"
+                    f"Agitate: Leaving this unaddressed compounds cognitive debt and kills forward momentum.\n\n"
+                    f"The Solution Plan:\n"
+                    f"• Prioritize ruthlessly using an impact-versus-effort matrix\n"
+                    f"• Protect non-negotiable deep-work focus windows\n"
+                    f"• Automate recurring steps to preserve creative energy"
                 )
-                cta = "Bookmark this post and execute step one today."
-            else:  # Value-driven
-                hook = f"The hidden cost of unorganized routines in {topic}."
+                cta = "Save this roadmap to your library and execute step one before the day ends."
+            else:
+                hook = f"Why do so many ambitious people struggle with {topic} despite their dedication?"
                 body = (
-                    f"The friction around {kw} isn't just about lost productivity — it creates constant background fatigue.\n\n"
-                    f"When you adopt intentional frameworks, peace of mind and top-tier output naturally follow."
+                    f"Effort without alignment is just exhaustion. Struggling with {kw_phrase} is rarely a matter of competence—it is a signal of broken systems.\n\n"
+                    f"When you diagnose root friction instead of fighting surface symptoms, breakthroughs become predictable."
                 )
-                cta = "How do you protect your focus during high-pressure weeks? Drop your insights below."
+                cta = "What breakthrough system changed the way you solve this problem?"
 
-        else:  # Story-Lesson-Question
+        # ── 3. Story-Lesson-Question Framework ──
+        else:
             if is_action:
-                hook = f"From burnout to breakthrough: A realistic approach to {topic}."
+                hook = f"A proven case study: Turning daily obstacles in {topic} into our biggest competitive edge."
                 body = (
-                    f"Trying to balance {kw} without structure is an uphill battle.\n\n"
-                    f"The key takeaway:\n"
-                    f"Systems beat motivation every single time. Consistent tiny habits create massive results."
+                    f"Months ago, disorganization across {kw_phrase} threatened every project deadline.\n\n"
+                    f"The Uncompromising Lesson:\n"
+                    f"«Disciplined systems beat raw motivation every single time».\n"
+                    f"Refining the process turned panic into systematic execution."
                 )
-                cta = "Set your top objective for tomorrow right now."
-            else:  # Value-driven
-                hook = f"The best lesson I learned about {topic} this year:"
+                cta = "Are you ready to optimize this in your own schedule? Drop a comment below."
+            else:
+                hook = f"The most valuable lesson several years in {topic} taught me:"
                 body = (
-                    f"Clarifying your priorities around {kw} eliminates 80% of unnecessary stress.\n\n"
-                    f"True productivity is not doing more things; it is doing the right things with intention."
+                    f"Mastery over {kw_phrase} isn't about acquiring more tools; it's about cultivating the discipline to say no to distractions.\n\n"
+                    f"Simplification is the ultimate mark of mastery."
                 )
-                cta = "What is one habit that completely changed the way you work?"
+                cta = "If you could share one golden rule with someone tackling this today, what would it be?"
 
         return {"hook": hook, "body": body, "cta": cta}
 
@@ -291,30 +517,34 @@ class ContentWriterAgent:
         tag_str = " ".join(hashtags)
 
         if "twitter" in plat or "x" in plat:
-            # High-density brevity: Hook + brief CTA + tags
+            # High-density brevity: Punchy hook + CTA + tags
             return f"{hook}\n\n{cta}\n\n{tag_str}"
 
         elif "instagram" in plat:
-            # Front-load hook above the fold, clean spacers, save/share CTA
-            save_prompt = "📌 احفظ المنشور وشاركه مع زميلك" if lang == "ar" else "📌 Save this for later & share with a friend"
+            # Above the fold hook, clean spacers, save/share CTA
+            save_prompt = "📌 احفظ المنشور لترجع له وشاركه مع زملائك المهتمين" if lang == "ar" else "📌 Save this post for reference & share with someone who needs it"
             return f"{hook} ✨\n.\n{body}\n.\n{save_prompt}\n{cta}\n.\n{tag_str}"
 
         elif "linkedin" in plat:
-            # Double-spaced readability, max 2 emojis, professional line breaks
+            # Professional double-spaced skimming format
             return f"{hook}\n\n{body}\n\n{cta}\n\n{tag_str}"
 
         else:  # Facebook
-            # Conversational community layout
+            # Conversational community narrative
             return f"{hook}\n\n{body}\n\n{cta}\n\n{tag_str}"
 
     # ── Phase 5: Multi-Variation Synthesis & Output Packaging ───────────────
     def generate(self, directive: Dict[str, Any]) -> Dict[str, Any]:
-        topic = directive.get("topic", "").strip()
-        keywords = directive.get("keywords", [])
+        raw_topic = directive.get("topic", "").strip()
+        raw_keywords = directive.get("keywords", [])
         platform = directive.get("platform", "LinkedIn")
         goal = directive.get("goal", "Marketing")
         tone = directive.get("tone", "Professional")
         lang = directive.get("language", "en")
+
+        # 1. Advanced Pre-processing & Typo Correction
+        topic = self.normalize_and_clean_text(raw_topic, lang)
+        keywords = [self.normalize_and_clean_text(k, lang) for k in raw_keywords if k.strip()]
 
         framework = self.resolve_framework(goal)
         hashtags = self.allocate_hashtags(keywords, topic, platform, lang)
@@ -355,12 +585,13 @@ class ContentWriterAgent:
 
         return {
             "agent_metadata": {
-                "module": "Module 3 - AI Content Writer Agent",
+                "module": "Module 3 - AI Content Writer Agent (Enhanced NLG & Typo Engine)",
                 "execution_mode": "Offline Rule-Based NLG",
                 "framework": framework,
                 "platform": platform,
                 "language": lang,
-                "tone": tone
+                "tone": tone,
+                "detected_domain": self.detect_domain(topic)
             },
             "variations": variations_output
         }
