@@ -1,15 +1,15 @@
 import { useEffect, useState } from 'react';
 import { Check, Copy, Download, ImageIcon, RefreshCw, TriangleAlert, WandSparkles } from 'lucide-react';
+import { API_BASE, imageFilename } from '../api';
 import './ImagePanel.css';
-
-const API_BASE = 'http://127.0.0.1:8000';
 
 function frameStyle(aspectRatio) {
   const [w, h] = aspectRatio.split(':').map(Number);
   return { aspectRatio: `${w} / ${h}`, '--frame-ratio': w / h };
 }
 
-function ImagePanel({ directive, hook }) {
+// onImageReady(filename | null) tells the parent which generated image can be published with the post.
+function ImagePanel({ directive, hook, onImageReady }) {
   const [engine, setEngine] = useState(null);
   const [visual, setVisual] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -38,6 +38,7 @@ function ImagePanel({ directive, hook }) {
       const payload = await response.json();
       if (response.ok && payload.status === 'success') {
         setVisual(payload.data);
+        onImageReady?.(imageFilename(payload.data.image_url));
       } else {
         setError('The server rejected the image request. Check the post inputs and try again.');
       }

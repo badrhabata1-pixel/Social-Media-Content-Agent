@@ -624,3 +624,141 @@ select {
     padding-top: 0;
   }
 }
+
+/* ── View tabs (App.jsx) ── */
+/* .content-wrapper / .peas-bar set their own display, which would override the hidden attribute. */
+.main-content [hidden] {
+  display: none !important;
+}
+
+.view-tabs {
+  display: inline-flex;
+  gap: 6px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-full);
+  padding: 4px;
+  margin-bottom: 24px;
+}
+
+.view-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.9rem;
+  padding: 8px 18px;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+}
+
+.view-tabs button.active {
+  background: var(--primary-hover);  /* white text needs >= 4.5:1; --primary is too light */
+  color: #ffffff;
+}
+
+/* ==========================================================================
+   Publishing to Facebook: button, toast, sidebar placeholders
+   ========================================================================== */
+.publish-row {
+  margin-top: 12px;
+}
+
+.btn-facebook {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 14px;
+  border: none;
+  border-radius: var(--radius-md);
+  /* Facebook blue, one step darker than #1877F2 so white text clears 4.5:1 */
+  background: #166fe5;
+  color: #ffffff;
+  font: inherit;
+  font-size: 0.95rem;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.btn-facebook:hover:not(:disabled) {
+  background: #1458c4;
+}
+
+.btn-facebook:disabled {
+  opacity: 0.75;
+  cursor: wait;
+}
+
+.toast {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 1000;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  max-width: min(420px, calc(100vw - 32px));
+  padding: 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-left: 4px solid;
+  border-radius: var(--radius-md);
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.15);
+  color: var(--text-main);
+}
+
+.toast-success { border-left-color: #16a34a; }
+.toast-success > svg { color: #16a34a; flex-shrink: 0; }
+.toast-error { border-left-color: var(--error-text); }
+.toast-error > svg { color: var(--error-text); flex-shrink: 0; }
+
+.toast-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  font-size: 0.9rem;
+}
+
+.toast-body span {
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.toast-body a {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #166fe5;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.toast-close {
+  margin-left: auto;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 2px;
+}
+
+.nav-menu li[aria-disabled="true"] {
+  cursor: default;
+}
+
+@media screen and (max-width: 768px) {
+  .toast {
+    left: 16px;
+    right: 16px;
+    bottom: 16px;
+  }
+}

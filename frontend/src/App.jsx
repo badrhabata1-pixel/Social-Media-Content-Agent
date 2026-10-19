@@ -1,8 +1,15 @@
-import React, { useState } from 'react';
+import { Suspense, lazy, useEffect, useState } from 'react';
 import Sidebar from './components/Sidebar';
 import ImagePanel from './components/ImagePanel';
-import { Send, Copy, RefreshCw, AlertCircle, Sparkles, Check } from 'lucide-react';
+import {
+  Send, Copy, RefreshCw, AlertCircle, Sparkles, Check, PenLine, ChartColumn, CircleCheck, ExternalLink, X,
+} from 'lucide-react';
+import { API_BASE, BACKEND_UNREACHABLE, apiErrorMessage, readJson } from './api';
 import './App.css';
+
+// Loaded on first visit to the Analytics tab, so the charting library stays out of the initial bundle.
+const AnalyticsDashboard = lazy(() => import('./components/AnalyticsDashboard'));
+const SUCCESS_TOAST_MS = 10000;
 
 // ── Directive Config Options ────────────────────────────────────────────────
 const PLATFORMS = [
@@ -46,6 +53,19 @@ function App() {
   const [copied, setCopied] = useState(false);
   const [submittedDirective, setSubmittedDirective] = useState(null);
   const [generationId, setGenerationId] = useState(0);
+  const [view, setView] = useState('create'); // 'create' | 'analytics'
+
+  // ── Publishing States ─────────────────────────────────────────────────────
+  const [generatedImage, setGeneratedImage] = useState(null); // file name reported by ImagePanel
+  const [publishing, setPublishing] = useState(false);
+  const [published, setPublished] = useState({});              // variation index -> Facebook URL
+  const [toast, setToast] = useState(null);                    // { type, title, message, url? }
+
+  useEffect(() => {
+    if (toast?.type !== 'success') return undefined;
+    const timer = setTimeout(() => setToast(null), SUCCESS_TOAST_MS);
+    return () => clearTimeout(timer);
+  }, [toast]);
 
   const handleGenerate = async () => {
     if (!topic.trim()) {
@@ -66,7 +86,7 @@ function App() {
     const directive = { topic: topic.trim(), keywords: kwList, platform, goal, tone, language };
 
     try {
-      const response = await fetch('http://127.0.0.1:8000/generate', {
+      const response = await fetch(`${API_BASE}/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(directive),
@@ -77,6 +97,8 @@ function App() {
         setActiveTab(0);
         setSubmittedDirective(directive);
         setGenerationId(id => id + 1);
+        setGeneratedImage(null); // a new post starts without an image
+        setPublished({});
       } else {
         setError('Agent returned an unexpected error response.');
       }
@@ -97,10 +119,55 @@ function App() {
 
   const currentVariation = result?.variations?.[activeTab];
 
+  const handlePublishFacebook = async () => {
+    if (!currentVariation || publishing) return;
+    const asPhoto = Boolean(generatedImage);
+    const confirmed = window.confirm(
+      `Publish this ${asPhoto ? 'photo post' : 'post'} publicly to your Facebook Page?`,
+    );
+    if (!confirmed) return;
+
+    const variationIndex = activeTab; // the user may switch tabs while the request runs
+    setPublishing(true);
+    setToast(null);
+    try {
+      const response = await fetch(`${API_BASE}/publish/facebook`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: currentVariation.full_caption,
+          topic: submittedDirective?.topic ?? null,
+          domain: result.agent_metadata.detected_domain ?? null,
+          tone: result.agent_metadata.tone ?? null,
+          image_filename: generatedImage,
+        }),
+      });
+      const payload = await readJson(response);
+      if (!response.ok || payload?.status !== 'success') {
+        throw new Error(apiErrorMessage(payload, response.status));
+      }
+      setPublished(prev => ({ ...prev, [variationIndex]: payload.data.url }));
+      setToast({
+        type: 'success',
+        title: 'Published to Facebook',
+        message: asPhoto ? 'Your photo post is live on the Page.' : 'Your post is live on the Page.',
+        url: payload.data.url,
+      });
+    } catch (err) {
+      setToast({
+        type: 'error',
+        title: 'Publishing failed',
+        message: err instanceof TypeError ? BACKEND_UNREACHABLE : err.message,
+      });
+    } finally {
+      setPublishing(false);
+    }
+  };
+
   return (
     <div className={`app-layout ${language === 'ar' ? 'lang-arabic' : ''}`}>
       {/* ── Sidebar Component from GitHub Theme ── */}
-      <Sidebar />
+      <Sidebar activeView={view} onNavigate={setView} />
 
       {/* ── Main Content Area ── */}
       <main className="main-content">
@@ -112,11 +179,29 @@ function App() {
           </div>
           <h1>My Content Dashboard</h1>
           <p>
-            Transforms high-level directives into platform-compliant, multi-angle publications using deterministic PEAS reasoning.
+            Transforms high-level directives into platform-compliant, multi-angle publications using rule-based PEAS reasoning.
           </p>
         </div>
 
-        <div className="content-wrapper">
+        {/* ── View tabs: the Create view stays mounted (hidden) so a generated post survives a tab switch ── */}
+        <div className="view-tabs" role="tablist" aria-label="Dashboard views">
+          <button type="button" role="tab" aria-selected={view === 'create'}
+                  className={view === 'create' ? 'active' : ''} onClick={() => setView('create')}>
+            <PenLine size={16} /> Create Post
+          </button>
+          <button type="button" role="tab" aria-selected={view === 'analytics'}
+                  className={view === 'analytics' ? 'active' : ''} onClick={() => setView('analytics')}>
+            <ChartColumn size={16} /> Analytics Dashboard
+          </button>
+        </div>
+
+        {view === 'analytics' && (
+          <Suspense fallback={<div className="loading-state card"><div className="spinner-large" /></div>}>
+            <AnalyticsDashboard />
+          </Suspense>
+        )}
+
+        <div className="content-wrapper" hidden={view !== 'create'}>
           
           {/* ── Left Side: Sensor Directives (Inputs) ── */}
           <div className="input-section card">
@@ -290,14 +375,36 @@ function App() {
                   </button>
                 </div>
 
-                <ImagePanel key={generationId} directive={submittedDirective} hook={currentVariation.hook} />
+                {/* Publish: a photo post when ImagePanel has produced an image, otherwise a text post */}
+                <div className="publish-row" dir="ltr">
+                  {published[activeTab] ? (
+                    <a className="btn-facebook" href={published[activeTab]} target="_blank" rel="noreferrer">
+                      <Check size={18} /> Published · View on Facebook <ExternalLink size={16} />
+                    </a>
+                  ) : (
+                    <button className="btn-facebook" onClick={handlePublishFacebook} disabled={publishing}>
+                      {publishing ? (
+                        <><div className="spinner" /> Publishing…</>
+                      ) : (
+                        <><Send size={18} /> {generatedImage ? 'Publish Photo Post to Facebook' : 'Publish to Facebook'}</>
+                      )}
+                    </button>
+                  )}
+                </div>
+
+                <ImagePanel
+                  key={generationId}
+                  directive={submittedDirective}
+                  hook={currentVariation.hook}
+                  onImageReady={setGeneratedImage}
+                />
               </div>
             )}
           </div>
         </div>
 
         {/* ── Bottom: PEAS Formalization Summary Bar ── */}
-        <div className="peas-bar">
+        <div className="peas-bar" hidden={view !== 'create'}>
           <div className="peas-item">
             <span className="peas-label">Performance</span>
             <span className="peas-value">AIDA / PAS Structural Adherence</span>
@@ -317,6 +424,25 @@ function App() {
         </div>
 
       </main>
+
+      {/* ── Publish result toast ── */}
+      {toast && (
+        <div className={`toast toast-${toast.type}`} role={toast.type === 'error' ? 'alert' : 'status'}>
+          {toast.type === 'success' ? <CircleCheck size={20} /> : <AlertCircle size={20} />}
+          <div className="toast-body">
+            <strong>{toast.title}</strong>
+            <span>{toast.message}</span>
+            {toast.url && (
+              <a href={toast.url} target="_blank" rel="noreferrer">
+                {toast.url} <ExternalLink size={14} />
+              </a>
+            )}
+          </div>
+          <button type="button" className="toast-close" onClick={() => setToast(null)} aria-label="Dismiss">
+            <X size={16} />
+          </button>
+        </div>
+      )}
     </div>
   );
 }

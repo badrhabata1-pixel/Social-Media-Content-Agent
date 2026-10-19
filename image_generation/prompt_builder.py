@@ -4,7 +4,7 @@ import re
 from dataclasses import asdict, dataclass, field
 from typing import Literal, Optional, Sequence, get_args
 
-from agent import ContentWriterAgent
+from agent import ContentWriterAgent, keyword_in
 
 AspectRatio = Literal["1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "21:9"]
 VisualStyle = Literal["auto", "photo", "3d", "illustration"]
@@ -154,18 +154,10 @@ def _tone_key(tone: str) -> str:
     return "professional"
 
 
-def _keyword_in(keyword: str, text: str) -> bool:
-    if not keyword.isascii():
-        return keyword in text
-    # ASCII stems match at word starts only, so "ai" can't hit "maintain".
-    pattern = rf"\b{re.escape(keyword)}\b" if len(keyword) <= 2 else rf"\b{re.escape(keyword)}"
-    return re.search(pattern, text) is not None
-
-
 def detect_visual_domain(text: str) -> str:
     lowered = text.lower()
     for domain, data in ContentWriterAgent.DOMAINS.items():
-        if any(_keyword_in(kw, lowered) for kw in data["keywords"]):
+        if any(keyword_in(kw, lowered) for kw in data["keywords"]):
             return domain
     return "general"
 
