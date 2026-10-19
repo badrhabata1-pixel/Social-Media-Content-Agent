@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from agent import content_agent
+from image_generation import router as image_router
 
 app = FastAPI(
     title="Social Media Content Agent - Module 3",
@@ -18,6 +19,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(image_router)
 
 # ── Sensors: Sensory Input Data Contract (from Person 2 - Planner Agent) ────
 class DirectiveRequest(BaseModel):

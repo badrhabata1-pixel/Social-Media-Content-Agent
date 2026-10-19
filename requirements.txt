@@ -4,3 +4,5 @@ streamlit
 langchain
 python-dotenv
 google-generativeai
+google-genai
+pytest

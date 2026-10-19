@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import Sidebar from './components/Sidebar';
+import ImagePanel from './components/ImagePanel';
 import { Send, Copy, RefreshCw, AlertCircle, Sparkles, Check } from 'lucide-react';
 import './App.css';
 
@@ -43,6 +44,8 @@ function App() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [submittedDirective, setSubmittedDirective] = useState(null);
+  const [generationId, setGenerationId] = useState(0);
 
   const handleGenerate = async () => {
     if (!topic.trim()) {
@@ -60,23 +63,20 @@ function App() {
       .map(k => k.trim())
       .filter(Boolean);
 
+    const directive = { topic: topic.trim(), keywords: kwList, platform, goal, tone, language };
+
     try {
       const response = await fetch('http://127.0.0.1:8000/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          topic: topic.trim(),
-          keywords: kwList,
-          platform,
-          goal,
-          tone,
-          language,
-        }),
+        body: JSON.stringify(directive),
       });
       const data = await response.json();
       if (data.status === 'success') {
         setResult(data.data);
         setActiveTab(0);
+        setSubmittedDirective(directive);
+        setGenerationId(id => id + 1);
       } else {
         setError('Agent returned an unexpected error response.');
       }
@@ -289,6 +289,8 @@ function App() {
                     <RefreshCw size={16} /> Regenerate
                   </button>
                 </div>
+
+                <ImagePanel key={generationId} directive={submittedDirective} hook={currentVariation.hook} />
               </div>
             )}
           </div>
